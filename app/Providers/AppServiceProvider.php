@@ -3,8 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\HotelProvider;
-use App\Contracts\PlaceProvider;
 use App\Services\AmadeusService;
+use App\Services\OpenTripMapPlaceProvider;
 use App\Services\WikipediaPlaceProvider;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,9 +23,10 @@ class AppServiceProvider extends ServiceProvider
             AmadeusService::class,
         ], 'hotel.providers');
 
-        // Register place providers.
+        // Register destination and attraction providers.
         $this->app->tag([
             WikipediaPlaceProvider::class,
+            OpenTripMapPlaceProvider::class,
         ], 'place.providers');
     }
 
