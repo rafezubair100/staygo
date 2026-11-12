@@ -1,0 +1,5 @@
+@extends('layouts.app')
+@section('title','My account')
+@section('content')
+<div class="container py-5"><span class="eyebrow text-primary">YOUR STAYGO</span><h1>Hello, {{ $user->name }}</h1><p class="text-muted">Manage your travel activity and saved properties.</p><div class="row g-3 mt-3"><div class="col-md-4"><div class="stat-card"><strong>{{ $user->bookings->count() }}</strong><span>Booking requests</span></div></div><div class="col-md-4"><div class="stat-card"><strong>{{ $user->favourites->count() }}</strong><span>Saved hotels</span></div></div><div class="col-md-4"><div class="stat-card"><strong>{{ ucfirst($user->role) }}</strong><span>Account role</span></div></div></div><h3 class="mt-5">Saved hotels</h3><div class="row g-3">@forelse($user->favourites as $hotel)<div class="col-md-4"><div class="hotel-card p-3"><h5>{{ $hotel->name }}</h5><p>{{ $hotel->city }}, {{ $hotel->country }}</p><a href="{{ route('hotels.show',$hotel) }}">View hotel</a></div></div>@empty<p class="text-muted">You have not saved any hotels yet.</p>@endforelse</div><a class="btn btn-outline-primary mt-4" href="{{ route('bookings.index') }}">View booking requests</a></div>
+@endsection

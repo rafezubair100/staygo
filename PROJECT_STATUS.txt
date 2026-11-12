@@ -1,0 +1,4 @@
+Staygo Laravel 13 starter project.
+Requires PHP >= 8.3 and Composer install.
+Live supplier data requires approved API credentials.
+Seeded hotel records are sample development data, not real offers.
