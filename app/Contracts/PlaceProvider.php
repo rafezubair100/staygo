@@ -15,10 +15,14 @@ interface PlaceProvider
     public function isConfigured(): bool;
 
     /**
-     * Search destinations or places.
+     * Search destinations or places using normalized criteria.
      *
-     * @param string $keyword
-     * @return array
+     * Example:
+     * [
+     *     'keyword' => 'London',
+     *     'latitude' => 51.5072,
+     *     'longitude' => -0.1276,
+     * ]
      */
-    public function search(string $keyword): array;
+    public function search(array $criteria): array;
 }
