@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\DestinationController;
 use App\Http\Controllers\HotelController;
+use App\Http\Controllers\LiveHotelController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,9 @@ Route::get('/', [HotelController::class, 'home'])->name('home');
 Route::get('/search', [HotelController::class, 'search'])->name('hotels.search');
 Route::get('/destination-suggestions', [HotelController::class, 'suggest'])->name('destinations.suggest');
 Route::get('/hotels/{hotel}', [HotelController::class, 'show'])->name('hotels.show');
+Route::get('/stays/{hotelId}', [LiveHotelController::class, 'show'])
+    ->where('hotelId', '[A-Za-z0-9]+')
+    ->name('stays.show');
 Route::get('/destinations/{city}', [DestinationController::class, 'show'])->name('destinations.show');
 
 Route::get('/register', [AuthController::class, 'registerForm'])->name('register');
