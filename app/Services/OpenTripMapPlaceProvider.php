@@ -22,20 +22,24 @@ class OpenTripMapPlaceProvider implements PlaceProvider
     }
 
     /**
-     * Search attractions using a destination and its coordinates.
+     * Search attractions near a destination's coordinates.
      *
-     * Expected keyword format:
-     * London|51.5072|-0.1276
+     * Uses these entries of the normalized criteria:
+     * [
+     *     'keyword' => 'London',      // optional, used as the city label
+     *     'latitude' => 51.5072,      // required
+     *     'longitude' => -0.1276,     // required
+     * ]
      */
-    public function search(string $keyword): array
+    public function search(array $criteria): array
     {
-        $parts = explode('|', $keyword);
+        $city = $criteria['keyword'] ?? null;
+        $latitude = $criteria['latitude'] ?? null;
+        $longitude = $criteria['longitude'] ?? null;
 
-        if (count($parts) !== 3) {
-            return [];
-        }
-
-        [$city, $latitude, $longitude] = $parts;
+        $city = is_string($city) && trim($city) !== ''
+            ? trim($city)
+            : null;
 
         if (
             !is_numeric($latitude) ||
