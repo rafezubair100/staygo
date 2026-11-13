@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotel;
-use App\Services\AmadeusService;
+use App\Services\HotelSearchAggregator;
+use App\Services\LiteApiService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class HotelController extends Controller
 {
@@ -15,24 +15,39 @@ class HotelController extends Controller
         return view('home', compact('featured'));
     }
 
-    public function suggest(Request $request, AmadeusService $amadeus)
+    /**
+     * Destination autocomplete for the search form.
+     */
+    public function suggest(Request $request, LiteApiService $liteApi)
     {
         $keyword = trim((string) $request->query('q', ''));
-        if (mb_strlen($keyword) < 2 || !$amadeus->configured()) {
+
+        if (mb_strlen($keyword) < 2 || !$liteApi->configured()) {
             return response()->json([]);
         }
-        return response()->json(collect($amadeus->destinations($keyword))->map(fn ($place) => [
-            'name' => data_get($place, 'name'),
-            'country' => data_get($place, 'address.countryName'),
-            'city_code' => data_get($place, 'iataCode'),
-            'label' => trim(data_get($place, 'name', '').', '.data_get($place, 'address.countryName', ''), ', '),
-        ])->filter(fn ($place) => $place['name'] && $place['city_code'])->values());
+
+        return response()->json(
+            collect($liteApi->places($keyword))
+                ->take(8)
+                ->map(fn ($place) => [
+                    'name' => $place['name'],
+                    'label' => trim($place['name'].', '.($place['address'] ?? ''), ', '),
+                    'place_id' => $place['place_id'],
+                    // Kept empty for the existing search form script.
+                    'city_code' => '',
+                ])
+                ->values()
+        );
     }
 
-    public function search(Request $request, AmadeusService $amadeus)
+    /**
+     * Search live hotel offers worldwide, plus local hotel records.
+     */
+    public function search(Request $request, HotelSearchAggregator $aggregator, LiteApiService $liteApi)
     {
         $data = $request->validate([
             'destination' => ['required', 'string', 'max:120'],
+            'place_id' => ['nullable', 'string', 'max:255'],
             'city_code' => ['nullable', 'string', 'size:3'],
             'check_in' => ['required', 'date', 'after_or_equal:today'],
             'check_out' => ['required', 'date', 'after:check_in'],
@@ -45,13 +60,41 @@ class HotelController extends Controller
             'sort' => ['nullable', 'in:recommended,price_asc,price_desc,rating'],
         ]);
 
-        $offers = [];
-        $liveAvailable = false;
-        if ($amadeus->configured() && !empty($data['city_code'])) {
-            $offers = $amadeus->searchHotels($data['city_code'], $data['check_in'], $data['check_out'], $data['adults'], $data['rooms']);
-            $liveAvailable = count($offers) > 0;
+        // Live offers from every registered hotel provider.
+        $search = $aggregator->search([
+            'destination' => $data['destination'],
+            'place_id' => $data['place_id'] ?? null,
+            'check_in' => date('Y-m-d', strtotime($data['check_in'])),
+            'check_out' => date('Y-m-d', strtotime($data['check_out'])),
+            'adults' => (int) $data['adults'],
+            'rooms' => (int) $data['rooms'],
+            'stars' => $data['stars'] ?? null,
+            'sort' => $data['sort'] ?? null,
+            'limit' => 24,
+        ]);
+
+        $liveHotels = collect($search['results'])->pluck('hotel');
+
+        // Price filters apply to the price per night.
+        if (!empty($data['min_price'])) {
+            $liveHotels = $liveHotels->filter(
+                fn ($hotel) => ($hotel['price_per_night'] ?? 0) >= (float) $data['min_price']
+            );
         }
 
+        if (!empty($data['max_price'])) {
+            $liveHotels = $liveHotels->filter(
+                fn ($hotel) => ($hotel['price_per_night'] ?? 0) <= (float) $data['max_price']
+            );
+        }
+
+        if (($data['sort'] ?? '') === 'rating') {
+            $liveHotels = $liveHotels->sortByDesc(fn ($hotel) => $hotel['rating'] ?? 0);
+        }
+
+        $liveHotels = $liveHotels->values()->all();
+
+        // Local hotel records (development samples).
         $query = Hotel::query()->where(function ($q) use ($data) {
             $q->where('city', 'like', '%'.$data['destination'].'%')
               ->orWhere('country', 'like', '%'.$data['destination'].'%');
@@ -65,8 +108,14 @@ class HotelController extends Controller
         $localHotels = $query->paginate(12)->withQueryString();
 
         return view('hotels.search', [
-            'hotels' => $localHotels, 'offers' => $offers, 'liveAvailable' => $liveAvailable,
-            'criteria' => $data, 'supplierConfigured' => $amadeus->configured(),
+            'hotels' => $localHotels,
+            'liveHotels' => $liveHotels,
+            'providers' => $search['providers'],
+            'criteria' => $data,
+            'supplierConfigured' => $liteApi->configured(),
+            // Used by the previous search page layout.
+            'offers' => [],
+            'liveAvailable' => false,
         ]);
     }
 
