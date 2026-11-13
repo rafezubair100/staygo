@@ -168,6 +168,161 @@ class LiteApiService
     }
 
     /**
+     * Fetch the full details of one hotel: description, photos,
+     * facilities, rooms and policies.
+     *
+     * Returns null when the hotel cannot be loaded. Details change
+     * rarely, so successful responses are cached for 12 hours.
+     */
+    public function hotel(string $hotelId): ?array
+    {
+        $hotelId = trim($hotelId);
+
+        if (!$this->configured() || $hotelId === '') {
+            return null;
+        }
+
+        $cacheKey = 'liteapi_hotel_'.md5($hotelId);
+
+        $cached = Cache::get($cacheKey);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        try {
+            $response = $this->client(15)->get($this->url('/data/hotel'), [
+                'hotelId' => $hotelId,
+                'timeout' => 6,
+            ]);
+
+            $data = $response->json('data');
+
+            if (!$response->successful() || !is_array($data) || empty($data['id'])) {
+                Log::warning('LiteAPI hotel details request failed.', [
+                    'status' => $response->status(),
+                    'hotel_id' => $hotelId,
+                ]);
+
+                return null;
+            }
+
+            $hotel = [
+                'id' => $data['id'],
+                'name' => $data['name'] ?? 'Hotel',
+                'description' => $this->safeHtml($data['hotelDescription'] ?? null),
+                'important_information' => $this->plainText($data['hotelImportantInformation'] ?? null),
+                'checkin_from' => data_get($data, 'checkinCheckoutTimes.checkin_start'),
+                'checkout_until' => data_get($data, 'checkinCheckoutTimes.checkout'),
+                'main_photo' => $data['main_photo'] ?? null,
+                'images' => collect($data['hotelImages'] ?? [])
+                    ->sortBy(fn ($image) => data_get($image, 'order', PHP_INT_MAX))
+                    ->map(fn ($image) => [
+                        'url' => data_get($image, 'urlHd') ?: data_get($image, 'url'),
+                        'thumbnail' => data_get($image, 'url') ?: data_get($image, 'urlHd'),
+                        'caption' => data_get($image, 'caption'),
+                    ])
+                    ->filter(fn ($image) => !empty($image['url']))
+                    ->values()
+                    ->all(),
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'country' => $data['country'] ?? null,
+                'stars' => $data['starRating'] ?? null,
+                'rating' => $data['rating'] ?? null,
+                'review_count' => $data['reviewCount'] ?? null,
+                'latitude' => data_get($data, 'location.latitude'),
+                'longitude' => data_get($data, 'location.longitude'),
+                'facilities' => collect($data['hotelFacilities'] ?? [])
+                    ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+                    ->map(fn ($name) => trim($name))
+                    ->unique()
+                    ->values()
+                    ->all(),
+                'rooms' => collect($data['rooms'] ?? [])
+                    ->filter(fn ($room) => isset($room['id']))
+                    ->mapWithKeys(fn ($room) => [
+                        (string) $room['id'] => [
+                            'id' => $room['id'],
+                            'name' => $room['roomName'] ?? null,
+                            'description' => $this->plainText($room['description'] ?? null),
+                            'size' => $room['roomSizeSquare'] ?? null,
+                            'max_occupancy' => $room['maxOccupancy'] ?? null,
+                            'beds' => collect($room['bedTypes'] ?? [])
+                                ->map(fn ($bed) => trim(
+                                    (data_get($bed, 'quantity') ?: 1).' x '.data_get($bed, 'bedType', 'bed')
+                                ))
+                                ->values()
+                                ->all(),
+                            'amenities' => collect($room['roomAmenities'] ?? [])
+                                ->sortBy(fn ($amenity) => data_get($amenity, 'sort', PHP_INT_MAX))
+                                ->pluck('name')
+                                ->filter()
+                                ->values()
+                                ->all(),
+                            'photos' => collect($room['photos'] ?? [])
+                                ->sortByDesc(fn ($photo) => (bool) data_get($photo, 'mainPhoto'))
+                                ->map(fn ($photo) => data_get($photo, 'url') ?: data_get($photo, 'hd_url'))
+                                ->filter()
+                                ->values()
+                                ->all(),
+                        ],
+                    ])
+                    ->all(),
+                'policies' => collect($data['policies'] ?? [])
+                    ->map(fn ($policy) => [
+                        'name' => data_get($policy, 'name'),
+                        'description' => $this->plainText(data_get($policy, 'description')),
+                    ])
+                    ->filter(fn ($policy) => !empty($policy['name']) && !empty($policy['description']))
+                    ->values()
+                    ->all(),
+            ];
+
+            Cache::put($cacheKey, $hotel, now()->addHours(12));
+
+            return $hotel;
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI hotel details connection error.', [
+                'hotel_id' => $hotelId,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Keep only simple formatting tags, with every attribute removed,
+     * so supplier text is safe to show as HTML.
+     */
+    protected function safeHtml(mixed $html): ?string
+    {
+        if (!is_string($html) || trim($html) === '') {
+            return null;
+        }
+
+        $html = strip_tags($html, '<p><br><ul><ol><li><strong><b><em><i>');
+
+        return trim(preg_replace('/<(\/?)([a-zA-Z]+)[^>]*>/', '<$1$2>', $html));
+    }
+
+    /**
+     * Remove all HTML and tidy the white space.
+     */
+    protected function plainText(mixed $text): ?string
+    {
+        if (!is_string($text) || trim($text) === '') {
+            return null;
+        }
+
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim(preg_replace('/\s+/u', ' ', $text));
+    }
+
+    /**
      * Build an HTTP client that sends the API key.
      */
     protected function client(int $timeout): PendingRequest
