@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\Log;
 class PlaceSearchAggregator
 {
     /**
-     * Search all registered place providers.
+     * Search all registered place providers using normalized criteria.
+     *
+     * Example:
+     * [
+     *     'keyword' => 'London',
+     *     'latitude' => 51.5072,
+     *     'longitude' => -0.1276,
+     * ]
      */
-    public function search(string $keyword): array
+    public function search(array $criteria): array
     {
         $results = [];
         $providers = [];
@@ -46,7 +53,7 @@ class PlaceSearchAggregator
 
             try {
                 // Search the current provider.
-                $providerResults = $provider->search($keyword);
+                $providerResults = $provider->search($criteria);
 
                 $providers[$providerName] = 'searched';
 
