@@ -47,22 +47,25 @@ class WikipediaService
     }
 
     /**
-     * Find Wikipedia articles about places near the given coordinates.
+     * Find Wikipedia articles located near the given coordinates.
      *
-     * Results are sorted by distance. Failed requests are not cached.
+     * Results are ordered by Wikipedia's own relevance ranking, so
+     * well-known articles come first. The list is unfiltered and can
+     * include events and organisations as well as places.
+     * Failed requests are not cached.
      */
     public function nearby(
         float $latitude,
         float $longitude,
-        int $radius = 10000,
-        int $limit = 20
+        int $radius = 8000,
+        int $limit = 50
     ): array {
-        // Limits enforced by the Wikipedia geosearch API.
-        $radius = max(10, min($radius, 10000));
+        // The search works in whole kilometres.
+        $radiusKm = max(1, min((int) round($radius / 1000), 50));
         $limit = max(1, min($limit, 50));
 
         $point = round($latitude, 4).'|'.round($longitude, 4);
-        $cacheKey = 'wiki_nearby_'.md5($point.'|'.$radius.'|'.$limit);
+        $cacheKey = 'wiki_nearby_v2_'.md5($point.'|'.$radiusKm.'|'.$limit);
 
         $cached = Cache::get($cacheKey);
 
@@ -77,10 +80,10 @@ class WikipediaService
                     'action' => 'query',
                     'format' => 'json',
                     'formatversion' => 2,
-                    'generator' => 'geosearch',
-                    'ggscoord' => $point,
-                    'ggsradius' => $radius,
-                    'ggslimit' => $limit,
+                    'generator' => 'search',
+                    'gsrsearch' => 'nearcoord:'.$radiusKm.'km,'.round($latitude, 4).','.round($longitude, 4),
+                    'gsrnamespace' => 0,
+                    'gsrlimit' => $limit,
                     'prop' => 'coordinates|pageimages|description|info',
                     'inprop' => 'url',
                     'piprop' => 'thumbnail',
@@ -99,6 +102,7 @@ class WikipediaService
             }
 
             $places = collect($response->json('query.pages') ?? [])
+                ->sortBy(fn ($page) => data_get($page, 'index', PHP_INT_MAX))
                 ->map(fn ($page) => [
                     'title' => data_get($page, 'title'),
                     'description' => data_get($page, 'description'),
@@ -109,11 +113,13 @@ class WikipediaService
                     'distance' => data_get($page, 'coordinates.0.dist'),
                 ])
                 ->filter(fn ($place) => !empty($place['title']))
-                ->sortBy(fn ($place) => $place['distance'] ?? PHP_FLOAT_MAX)
                 ->values()
                 ->all();
 
-            Cache::put($cacheKey, $places, now()->addHours(12));
+            // Only keep successful, non-empty responses in the cache.
+            if (count($places) > 0) {
+                Cache::put($cacheKey, $places, now()->addHours(12));
+            }
 
             return $places;
 
