@@ -29,9 +29,18 @@ class WikipediaPlaceProvider implements PlaceProvider
 
     /**
      * Search for a destination using Wikipedia's summary API.
+     *
+     * Uses the 'keyword' entry of the normalized criteria, for example:
+     * ['keyword' => 'London']
      */
-    public function search(string $keyword): array
+    public function search(array $criteria): array
     {
+        $keyword = $criteria['keyword'] ?? '';
+
+        if (!is_string($keyword)) {
+            return [];
+        }
+
         $keyword = trim($keyword);
 
         if ($keyword === '') {
