@@ -6,6 +6,7 @@ use App\Contracts\HotelProvider;
 use App\Services\AmadeusService;
 use App\Services\LiteApiHotelProvider;
 use App\Services\OpenTripMapPlaceProvider;
+use App\Services\WikipediaNearbyPlaceProvider;
 use App\Services\WikipediaPlaceProvider;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
         // Register destination and attraction providers.
         $this->app->tag([
             WikipediaPlaceProvider::class,
+            WikipediaNearbyPlaceProvider::class,
             OpenTripMapPlaceProvider::class,
         ], 'place.providers');
     }
