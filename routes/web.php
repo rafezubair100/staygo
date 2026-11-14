@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DestinationController;
 use App\Http\Controllers\HotelController;
 use App\Http\Controllers\LiveHotelController;
@@ -31,6 +32,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/hotels/{hotel}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
     Route::get('/my-bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::post('/hotels/{hotel}/booking-request', [BookingController::class, 'store'])->name('bookings.store');
+
+    // Live hotel checkout.
+    Route::post('/checkout', [CheckoutController::class, 'start'])->name('checkout.start');
+    Route::get('/checkout/{token}', [CheckoutController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]+')
+        ->name('checkout.show');
+    Route::post('/checkout/{token}', [CheckoutController::class, 'confirm'])
+        ->where('token', '[A-Za-z0-9]+')
+        ->middleware('throttle:6,1')
+        ->name('checkout.confirm');
+    Route::get('/bookings/{booking}/confirmation', [CheckoutController::class, 'confirmation'])
+        ->name('bookings.confirmation');
 });
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
