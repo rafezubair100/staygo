@@ -4,7 +4,7 @@
 <div class="container py-5">
   <h1>My bookings</h1>
 
-  @if($bookings->contains(fn ($booking) => $booking->status !== 'confirmed'))
+  @if($bookings->contains(fn ($booking) => !in_array($booking->status, ['confirmed', 'cancelled'])))
     <p class="text-muted">A request is not a confirmed reservation until the supplier confirms it.</p>
   @endif
 
@@ -18,6 +18,7 @@
           <th>Total</th>
           <th>Status</th>
           <th>Reference</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -48,13 +49,26 @@
             <td>
               @if($booking->status === 'confirmed')
                 <span class="badge bg-success">Confirmed</span>
+              @elseif($booking->isCancelled())
+                <span class="badge bg-danger">Cancelled</span>
               @else
                 <span class="badge bg-warning text-dark">{{ ucfirst(str_replace('_', ' ', $booking->status)) }}</span>
               @endif
               @if($booking->is_sandbox)
                 <span class="badge bg-secondary">Test booking</span>
               @endif
-              @if($booking->isLive())
+              @if($booking->isCancelled())
+                <small class="d-block text-muted mt-1">
+                  @if($booking->cancelled_at)
+                    on {{ $booking->cancelled_at->format('d M Y') }} ·
+                  @endif
+                  @if($booking->refund_amount !== null && (float) $booking->refund_amount > 0)
+                    refund {{ $booking->currency }} {{ number_format((float) $booking->refund_amount, 2) }}
+                  @else
+                    no refund
+                  @endif
+                </small>
+              @elseif($booking->isLive())
                 <small class="d-block text-muted mt-1">
                   {{ $booking->refundable ? 'Free cancellation' : 'Non-refundable' }}
                 </small>
@@ -67,10 +81,18 @@
                 <span class="text-muted">—</span>
               @endif
             </td>
+            <td class="text-end text-nowrap">
+              @if($booking->isLive())
+                <a class="btn btn-sm btn-outline-primary" href="{{ route('bookings.confirmation', $booking) }}">View</a>
+              @endif
+              @if($booking->canBeCancelled())
+                <a class="btn btn-sm btn-outline-danger" href="{{ route('bookings.cancel.form', $booking) }}">Cancel</a>
+              @endif
+            </td>
           </tr>
         @empty
           <tr>
-            <td colspan="6" class="text-muted">No bookings yet.</td>
+            <td colspan="7" class="text-muted">No bookings yet.</td>
           </tr>
         @endforelse
       </tbody>
