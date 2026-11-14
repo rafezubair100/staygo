@@ -294,6 +294,190 @@ class LiteApiService
     }
 
     /**
+     * Check a chosen offer before booking it.
+     *
+     * LiteAPI confirms the room is still available and returns the
+     * final price. Returns ['ok' => bool, 'error' => ?string,
+     * 'data' => ?array]. The prebook_id in the data is needed by book().
+     */
+    public function prebook(string $offerId): array
+    {
+        $offerId = trim($offerId);
+
+        if (!$this->configured() || $offerId === '') {
+            return $this->failure('This offer could not be checked.');
+        }
+
+        try {
+            $response = $this->client(40)->post(
+                $this->bookUrl('/rates/prebook').'?timeout=30',
+                [
+                    'offerId' => $offerId,
+                    'usePaymentSdk' => false,
+                ]
+            );
+
+            $payload = $response->json();
+            $data = data_get($payload, 'data');
+
+            if (!$response->successful() || !is_array($data) || empty($data['prebookId'])) {
+                $code = data_get($payload, 'error.code');
+
+                Log::warning('LiteAPI prebook request failed.', [
+                    'status' => $response->status(),
+                    'code' => $code,
+                    'message' => data_get($payload, 'error.message')
+                        ?? data_get($payload, 'error.description'),
+                ]);
+
+                return $this->failure(
+                    $code === 4040
+                        ? 'This price has expired. Please go back and choose the room again.'
+                        : 'This room is no longer available. Please choose another room.'
+                );
+            }
+
+            $rate = data_get($data, 'roomTypes.0.rates.0', []);
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'data' => [
+                    'prebook_id' => $data['prebookId'],
+                    'hotel_id' => $data['hotelId'] ?? null,
+                    'check_in' => $data['checkin'] ?? null,
+                    'check_out' => $data['checkout'] ?? null,
+                    'price' => is_numeric($data['price'] ?? null) ? round((float) $data['price'], 2) : null,
+                    'currency' => $data['currency'] ?? null,
+                    'price_change_percent' => (float) ($data['priceDifferencePercent'] ?? 0),
+                    'cancellation_changed' => (bool) ($data['cancellationChanged'] ?? false),
+                    'board_changed' => (bool) ($data['boardChanged'] ?? false),
+                    'room_name' => $rate['name'] ?? null,
+                    'board' => $rate['boardName'] ?? null,
+                    'room_count' => count(data_get($data, 'roomTypes.0.rates', [])),
+                    'refundable' => data_get($rate, 'cancellationPolicies.refundableTag') === 'RFN',
+                    'cancel_by' => data_get($rate, 'cancellationPolicies.cancelPolicyInfos.0.cancelTime'),
+                    // Fees that are not in the price and are paid at the hotel.
+                    'pay_at_hotel' => collect(data_get($rate, 'retailRate.taxesAndFees') ?? [])
+                        ->filter(fn ($fee) => data_get($fee, 'included') === false)
+                        ->map(fn ($fee) => [
+                            'description' => data_get($fee, 'description'),
+                            'amount' => data_get($fee, 'amount'),
+                            'currency' => data_get($fee, 'currency'),
+                        ])
+                        ->values()
+                        ->all(),
+                    'terms' => $this->plainText($data['termsAndConditions'] ?? null),
+                ],
+            ];
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI prebook connection error.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $this->failure('The booking service could not be reached. Please try again.');
+        }
+    }
+
+    /**
+     * Confirm a booking for a prebooked offer.
+     *
+     * $holder: ['firstName', 'lastName', 'email', 'phone']
+     * $guests: one entry per room, each with
+     *          ['occupancyNumber', 'firstName', 'lastName', 'email']
+     * $clientReference: a unique reference for this booking attempt,
+     *          which stops the same booking being made twice.
+     *
+     * Only sandbox keys are accepted. Sandbox bookings are simulated
+     * and nothing is charged. Live payments are not set up yet, so a
+     * production key is refused here.
+     *
+     * Returns ['ok' => bool, 'error' => ?string, 'data' => ?array].
+     */
+    public function book(string $prebookId, array $holder, array $guests, string $clientReference): array
+    {
+        if (!$this->configured() || trim($prebookId) === '') {
+            return $this->failure('This booking could not be started.');
+        }
+
+        if (!$this->sandbox()) {
+            return $this->failure('Online payment is not available yet, so this booking was not made.');
+        }
+
+        try {
+            $response = $this->client(60)->post(
+                $this->bookUrl('/rates/book').'?timeout=45',
+                [
+                    'prebookId' => trim($prebookId),
+                    'clientReference' => $clientReference,
+                    'holder' => $holder,
+                    'guests' => array_values($guests),
+                    'payment' => [
+                        'method' => 'ACC_CREDIT_CARD',
+                    ],
+                ]
+            );
+
+            $payload = $response->json();
+            $data = data_get($payload, 'data');
+
+            if (!$response->successful() || !is_array($data) || empty($data['bookingId'])) {
+                Log::warning('LiteAPI book request failed.', [
+                    'status' => $response->status(),
+                    'code' => data_get($payload, 'error.code'),
+                    'message' => data_get($payload, 'error.message')
+                        ?? data_get($payload, 'error.description'),
+                ]);
+
+                return $this->failure('The booking could not be confirmed. You have not been charged.');
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'data' => [
+                    'booking_id' => $data['bookingId'],
+                    'status' => $data['status'] ?? null,
+                    'hotel_confirmation_code' => $data['hotelConfirmationCode'] ?? null,
+                    'hotel_id' => data_get($data, 'hotel.hotelId'),
+                    'hotel_name' => data_get($data, 'hotel.name'),
+                    'check_in' => $data['checkin'] ?? null,
+                    'check_out' => $data['checkout'] ?? null,
+                    'price' => is_numeric($data['price'] ?? null) ? round((float) $data['price'], 2) : null,
+                    'currency' => $data['currency'] ?? null,
+                    'refundable' => ($data['tag'] ?? null) === 'RFN',
+                    'last_free_cancellation' => $data['lastFreeCancellationDate'] ?? null,
+                    'sandbox' => (bool) data_get($payload, 'sandbox', true),
+                ],
+            ];
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI book connection error.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $this->failure('The booking service could not be reached. Please check My bookings before trying again.');
+        }
+    }
+
+    /**
+     * Whether the configured key is a sandbox (test) key.
+     */
+    public function sandbox(): bool
+    {
+        return str_starts_with((string) config('services.liteapi.api_key'), 'sand_');
+    }
+
+    /**
+     * Build a failed result with a message that is safe to show.
+     */
+    protected function failure(string $message): array
+    {
+        return ['ok' => false, 'error' => $message, 'data' => null];
+    }
+
+    /**
      * Keep only simple formatting tags, with every attribute removed,
      * so supplier text is safe to show as HTML.
      */
@@ -336,10 +520,18 @@ class LiteApiService
     }
 
     /**
-     * Build the full URL for an API path.
+     * Build the full URL for a search or data API path.
      */
     protected function url(string $path): string
     {
         return rtrim((string) config('services.liteapi.base_url'), '/').$path;
+    }
+
+    /**
+     * Build the full URL for a booking API path.
+     */
+    protected function bookUrl(string $path): string
+    {
+        return rtrim((string) config('services.liteapi.book_base_url'), '/').$path;
     }
 }
