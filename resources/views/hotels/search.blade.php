@@ -15,7 +15,7 @@
         · {{ $criteria['rooms'] }} {{ Str::plural('room', (int) $criteria['rooms']) }}
       </p>
     </div>
-    <a href="{{ route('destinations.show', Str::slug($criteria['destination'])) }}" class="btn btn-outline-primary">Destination guide</a>
+    <a href="{{ route('destinations.show', Str::slug(Str::before($criteria['destination'], ','))) }}" class="btn btn-outline-primary">Destination guide</a>
   </div>
 
   {{-- Status message --}}
