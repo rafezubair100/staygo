@@ -81,15 +81,29 @@
       @if(count($liveHotels) > 0)
         <div class="row g-3 mb-5">
           @foreach($liveHotels as $hotel)
+            @php
+              // Link to the hotel page, keeping the searched dates and guests.
+              $stayUrl = (($hotel['provider'] ?? '') === 'liteapi' && !empty($hotel['id']))
+                  ? route('stays.show', [
+                      'hotelId' => $hotel['id'],
+                      'check_in' => $criteria['check_in'],
+                      'check_out' => $criteria['check_out'],
+                      'adults' => $criteria['adults'],
+                      'rooms' => $criteria['rooms'],
+                  ])
+                  : null;
+            @endphp
             <div class="col-12">
               <div class="hotel-card">
                 <div class="row g-0">
                   <div class="col-md-4">
+                    @if($stayUrl)<a href="{{ $stayUrl }}" class="d-block h-100">@endif
                     @if(!empty($hotel['image']))
                       <img src="{{ $hotel['image'] }}" alt="{{ $hotel['name'] }}" loading="lazy" class="w-100 h-100" style="object-fit:cover;min-height:200px;max-height:260px">
                     @else
                       <div class="hotel-placeholder h-100">✦</div>
                     @endif
+                    @if($stayUrl)</a>@endif
                   </div>
                   <div class="col-md-8">
                     <div class="p-3 h-100 d-flex flex-column">
@@ -98,7 +112,13 @@
                           @if((int) round($hotel['stars'] ?? 0) > 0)
                             <span class="stars">{{ str_repeat('★', (int) round($hotel['stars'])) }}</span>
                           @endif
-                          <h5 class="mb-1">{{ $hotel['name'] }}</h5>
+                          <h5 class="mb-1">
+                            @if($stayUrl)
+                              <a href="{{ $stayUrl }}" class="text-decoration-none text-reset">{{ $hotel['name'] }}</a>
+                            @else
+                              {{ $hotel['name'] }}
+                            @endif
+                          </h5>
                           <p class="text-muted mb-2">
                             {{ collect([$hotel['address'] ?? null, $hotel['city'] ?? null])->filter()->implode(', ') }}
                           </p>
@@ -125,16 +145,21 @@
                         @endif
                       </div>
 
-                      <div class="d-flex justify-content-between align-items-end mt-auto pt-3">
+                      <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mt-auto pt-3">
                         <small class="text-muted">Live price</small>
-                        <div class="text-end">
-                          <strong class="fs-4">{{ $hotel['currency'] }} {{ number_format((float) $hotel['price'], 2) }}</strong>
-                          <small class="d-block text-muted">
-                            total for {{ $hotel['nights'] }} {{ Str::plural('night', (int) $hotel['nights']) }}
-                            @if(!empty($hotel['price_per_night']))
-                              · {{ $hotel['currency'] }} {{ number_format((float) $hotel['price_per_night'], 2) }} per night
-                            @endif
-                          </small>
+                        <div class="d-flex align-items-end gap-3">
+                          <div class="text-end">
+                            <strong class="fs-4">{{ $hotel['currency'] }} {{ number_format((float) $hotel['price'], 2) }}</strong>
+                            <small class="d-block text-muted">
+                              total for {{ $hotel['nights'] }} {{ Str::plural('night', (int) $hotel['nights']) }}
+                              @if(!empty($hotel['price_per_night']))
+                                · {{ $hotel['currency'] }} {{ number_format((float) $hotel['price_per_night'], 2) }} per night
+                              @endif
+                            </small>
+                          </div>
+                          @if($stayUrl)
+                            <a href="{{ $stayUrl }}" class="btn btn-primary flex-shrink-0">View rooms</a>
+                          @endif
                         </div>
                       </div>
                     </div>
