@@ -44,6 +44,13 @@ Route::middleware('auth')->group(function () {
         ->name('checkout.confirm');
     Route::get('/bookings/{booking}/confirmation', [CheckoutController::class, 'confirmation'])
         ->name('bookings.confirmation');
+
+    // Cancelling a live booking.
+    Route::get('/bookings/{booking}/cancel', [BookingController::class, 'cancelForm'])
+        ->name('bookings.cancel.form');
+    Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel'])
+        ->middleware('throttle:6,1')
+        ->name('bookings.cancel');
 });
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
