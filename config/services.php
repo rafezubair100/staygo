@@ -9,6 +9,7 @@ return [
 
     'liteapi' => [
         'base_url' => env('LITEAPI_BASE_URL', 'https://api.liteapi.travel/v3.0'),
+        'book_base_url' => env('LITEAPI_BOOK_BASE_URL', 'https://book.liteapi.travel/v3.0'),
         'api_key' => env('LITEAPI_API_KEY'),
     ],
 
