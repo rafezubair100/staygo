@@ -132,7 +132,20 @@
                     <strong class="fs-5">{{ $offer['currency'] }} {{ number_format((float) $offer['price'], 2) }}</strong>
                     <small class="d-block text-muted">{{ $offer['currency'] }} {{ number_format((float) $offer['price_per_night'], 2) }} per night</small>
                   </div>
-                  <button class="btn btn-primary" type="button" disabled>Booking coming soon</button>
+                  @auth
+                    <form method="POST" action="{{ route('checkout.start') }}">
+                      @csrf
+                      <input type="hidden" name="offer_id" value="{{ $offer['offer_id'] }}">
+                      <input type="hidden" name="hotel_id" value="{{ $hotel['id'] }}">
+                      <input type="hidden" name="check_in" value="{{ $criteria['check_in'] }}">
+                      <input type="hidden" name="check_out" value="{{ $criteria['check_out'] }}">
+                      <input type="hidden" name="adults" value="{{ $criteria['adults'] }}">
+                      <input type="hidden" name="rooms" value="{{ $criteria['rooms'] }}">
+                      <button class="btn btn-primary" type="submit">Reserve</button>
+                    </form>
+                  @else
+                    <a class="btn btn-outline-primary" href="{{ route('login') }}">Log in to reserve</a>
+                  @endauth
                 </div>
               </div>
             @endforeach
