@@ -462,6 +462,72 @@ class LiteApiService
     }
 
     /**
+     * Cancel a confirmed booking with the supplier.
+     *
+     * This cannot be undone. A non-refundable booking is still
+     * cancelled, but little or nothing is refunded.
+     *
+     * Returns ['ok' => bool, 'error' => ?string, 'data' => ?array].
+     * The data holds the supplier status, any cancellation fee and
+     * the refund amount.
+     */
+    public function cancel(string $bookingId): array
+    {
+        $bookingId = trim($bookingId);
+
+        if (!$this->configured() || !preg_match('/^[A-Za-z0-9_-]+$/', $bookingId)) {
+            return $this->failure('This booking could not be cancelled.');
+        }
+
+        try {
+            $response = $this->client(40)->put(
+                $this->bookUrl('/bookings/'.$bookingId).'?timeout=30'
+            );
+
+            $payload = $response->json();
+            $data = data_get($payload, 'data');
+            $status = strtoupper((string) data_get($data, 'status'));
+
+            if ($response->status() !== 200 || !is_array($data) || !str_starts_with($status, 'CANCEL')) {
+                Log::warning('LiteAPI cancel request failed.', [
+                    'status' => $response->status(),
+                    'booking_id' => $bookingId,
+                    'code' => data_get($payload, 'error.code'),
+                    'message' => data_get($payload, 'error.message')
+                        ?? data_get($payload, 'error.description'),
+                ]);
+
+                return $this->failure('The booking could not be cancelled. It is still active. Please try again or contact support.');
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'data' => [
+                    'booking_id' => $data['bookingId'] ?? $bookingId,
+                    'status' => $status,
+                    'cancellation_fee' => is_numeric($data['cancellation_fee'] ?? null)
+                        ? round((float) $data['cancellation_fee'], 2)
+                        : null,
+                    'refund_amount' => is_numeric($data['refund_amount'] ?? null)
+                        ? round((float) $data['refund_amount'], 2)
+                        : null,
+                    'currency' => $data['currency'] ?? null,
+                    'sandbox' => (bool) data_get($payload, 'sandbox', $this->sandbox()),
+                ],
+            ];
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI cancel connection error.', [
+                'booking_id' => $bookingId,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $this->failure('The booking service could not be reached, so the booking was not cancelled. Please try again.');
+        }
+    }
+
+    /**
      * Whether the configured key is a sandbox (test) key.
      */
     public function sandbox(): bool
