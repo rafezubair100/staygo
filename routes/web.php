@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DestinationController;
+use App\Http\Controllers\FlightCheckoutController;
 use App\Http\Controllers\FlightController;
 use App\Http\Controllers\HotelController;
 use App\Http\Controllers\LiveHotelController;
@@ -50,6 +51,18 @@ Route::middleware('auth')->group(function () {
         ->name('checkout.confirm');
     Route::get('/bookings/{booking}/confirmation', [CheckoutController::class, 'confirmation'])
         ->name('bookings.confirmation');
+
+    // Flight checkout.
+    Route::post('/flights/select', [FlightCheckoutController::class, 'select'])->name('flights.select');
+    Route::get('/flights/checkout/{token}', [FlightCheckoutController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]+')
+        ->name('flights.checkout.show');
+    Route::post('/flights/checkout/{token}', [FlightCheckoutController::class, 'confirm'])
+        ->where('token', '[A-Za-z0-9]+')
+        ->middleware('throttle:6,1')
+        ->name('flights.checkout.confirm');
+    Route::get('/flight-bookings/{flightBooking}/confirmation', [FlightCheckoutController::class, 'confirmation'])
+        ->name('flights.confirmation');
 
     // Cancelling a live booking.
     Route::get('/bookings/{booking}/cancel', [BookingController::class, 'cancelForm'])
