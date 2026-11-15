@@ -208,6 +208,24 @@
           </p>
         @endif
 
+        @if(!empty($conditions))
+          <hr>
+          <small class="text-muted d-block">Weather in {{ $hotel['city'] ?: 'this area' }} now</small>
+          <div class="d-flex align-items-baseline gap-2">
+            <strong class="fs-3">{{ round($conditions['temperature']) }}°C</strong>
+            <span class="text-capitalize">{{ $conditions['condition'] }}</span>
+          </div>
+          <small class="text-muted d-block">
+            @if(is_numeric($conditions['humidity'] ?? null)) Humidity {{ round($conditions['humidity']) }}% @endif
+            @if(is_numeric($conditions['wind'] ?? null)) · Wind {{ round($conditions['wind'], 1) }} m/s @endif
+          </small>
+          @if(($conditions['source'] ?? '') === 'Open-Meteo')
+            <small class="text-muted">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></small>
+          @elseif(!empty($conditions['source']))
+            <small class="text-muted">Weather data by {{ $conditions['source'] }}</small>
+          @endif
+        @endif
+
         @if(count($rooms) > 0)
           <hr>
           <p class="mb-0">
