@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Booking;
+use App\Models\FlightBooking;
 use App\Models\Hotel;
 use App\Models\Review;
 use App\Models\User;
-use App\Models\Booking;
 use Illuminate\Http\Request;
 
 class StaffController extends Controller
@@ -13,11 +14,17 @@ class StaffController extends Controller
     public function admin()
     {
         $stats = [
-            'users' => User::count(), 'hotels' => Hotel::count(),
-            'bookings' => Booking::count(), 'pending_reviews' => Review::where('status', 'pending')->count(),
+            'users' => User::count(),
+            'hotel_bookings' => Booking::count(),
+            'flight_bookings' => FlightBooking::count(),
+            'sample_hotels' => Hotel::count(),
+            'pending_reviews' => Review::where('status', 'pending')->count(),
         ];
+
         $recentBookings = Booking::with(['user', 'hotel'])->latest()->take(8)->get();
-        return view('staff.admin', compact('stats', 'recentBookings'));
+        $recentFlights = FlightBooking::with('user')->latest()->take(8)->get();
+
+        return view('staff.admin', compact('stats', 'recentBookings', 'recentFlights'));
     }
 
     public function users() { $users = User::latest()->paginate(20); return view('staff.users', compact('users')); }
