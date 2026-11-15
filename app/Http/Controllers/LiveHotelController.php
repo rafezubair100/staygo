@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\LiteApiService;
+use App\Services\WeatherService;
 use Illuminate\Http\Request;
 
 class LiveHotelController extends Controller
@@ -10,7 +11,7 @@ class LiveHotelController extends Controller
     /**
      * Show one live hotel with its available rooms and prices.
      */
-    public function show(Request $request, string $hotelId, LiteApiService $liteApi)
+    public function show(Request $request, string $hotelId, LiteApiService $liteApi, WeatherService $weather)
     {
         $data = $request->validate([
             'check_in' => ['nullable', 'date', 'after_or_equal:today'],
@@ -47,10 +48,18 @@ class LiveHotelController extends Controller
             $nights
         );
 
+        // Current weather at the hotel's location.
+        $conditions = $weather->current(
+            (string) ($hotel['city'] ?? $hotel['name']),
+            is_numeric($hotel['latitude']) ? (float) $hotel['latitude'] : null,
+            is_numeric($hotel['longitude']) ? (float) $hotel['longitude'] : null
+        );
+
         return view('hotels.live', [
             'hotel' => $hotel,
             'rooms' => $rooms,
             'nights' => $nights,
+            'conditions' => $conditions,
             'criteria' => [
                 'check_in' => $checkIn,
                 'check_out' => $checkOut,
