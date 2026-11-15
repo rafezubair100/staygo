@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DestinationController;
+use App\Http\Controllers\FlightController;
 use App\Http\Controllers\HotelController;
 use App\Http\Controllers\LiveHotelController;
 use App\Http\Controllers\ReviewController;
@@ -19,6 +20,11 @@ Route::get('/stays/{hotelId}', [LiveHotelController::class, 'show'])
     ->where('hotelId', '[A-Za-z0-9]+')
     ->name('stays.show');
 Route::get('/destinations/{city}', [DestinationController::class, 'show'])->name('destinations.show');
+
+Route::get('/flights', [FlightController::class, 'index'])->name('flights.index');
+Route::get('/airport-suggestions', [FlightController::class, 'airports'])
+    ->middleware('throttle:60,1')
+    ->name('flights.airports');
 
 Route::get('/register', [AuthController::class, 'registerForm'])->name('register');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
