@@ -194,6 +194,24 @@
               <small class="text-muted d-block">{{ $journey['currency'] }} {{ number_format((float) $journey['price_per_adult'], 2) }} per adult</small>
             @endif
             <small class="text-muted d-block mt-2">Total trip {{ $duration($journey['duration_minutes']) }}</small>
+
+            @auth
+              <form method="POST" action="{{ route('flights.select') }}" class="mt-3">
+                @csrf
+                <input type="hidden" name="journey_key" value="{{ $journey['key'] }}">
+                @foreach(['origin', 'origin_label', 'destination', 'destination_label', 'depart_date', 'return_date', 'adults', 'children', 'infants', 'cabin_class', 'sort'] as $field)
+                  @if($criteria[$field] !== null && $criteria[$field] !== '')
+                    <input type="hidden" name="{{ $field }}" value="{{ $criteria[$field] }}">
+                  @endif
+                @endforeach
+                @if($criteria['direct'])
+                  <input type="hidden" name="direct" value="1">
+                @endif
+                <button class="btn btn-primary w-100" type="submit">Select</button>
+              </form>
+            @else
+              <a class="btn btn-outline-primary w-100 mt-3" href="{{ route('login') }}">Log in to book</a>
+            @endauth
           </div>
 
         </div>
