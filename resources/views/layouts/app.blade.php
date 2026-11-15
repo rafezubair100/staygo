@@ -16,6 +16,8 @@
     <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
+        <li><a class="nav-link" href="{{ route('home') }}">Hotels</a></li>
+        <li><a class="nav-link" href="{{ route('flights.index') }}">Flights</a></li>
         <li><a class="nav-link" href="{{ route('home') }}#destinations">Destinations</a></li>
         <li><a class="nav-link" href="{{ route('home') }}#why">Why Staygo</a></li>
         @auth
@@ -35,7 +37,7 @@
 @if(session('success'))<div class="container mt-3"><div class="alert alert-success">{{ session('success') }}</div></div>@endif
 @if($errors->any())<div class="container mt-3"><div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
 <main>@yield('content')</main>
-<footer class="footer mt-5"><div class="container py-5"><div class="row g-4"><div class="col-md-5"><a class="brand text-white" href="{{ route('home') }}">staygo</a><p class="text-white-50 mt-3">Find your stay. Love your journey.<br>Discover destinations and compare hotel offers worldwide.</p></div><div class="col-md-3"><h6>Explore</h6><a href="{{ route('home') }}#destinations">Destinations</a><a href="{{ route('home') }}">Find hotels</a></div><div class="col-md-4"><h6>Staygo</h6><p class="text-white-50 small">Hotel availability and prices are supplied by connected providers and may change until confirmed.</p></div></div><hr class="border-secondary"><small class="text-white-50">© {{ date('Y') }} Staygo. All rights reserved.</small></div></footer>
+<footer class="footer mt-5"><div class="container py-5"><div class="row g-4"><div class="col-md-5"><a class="brand text-white" href="{{ route('home') }}">staygo</a><p class="text-white-50 mt-3">Find your stay. Love your journey.<br>Discover destinations and compare hotel offers worldwide.</p></div><div class="col-md-3"><h6>Explore</h6><a href="{{ route('home') }}#destinations">Destinations</a><a href="{{ route('home') }}">Find hotels</a><a href="{{ route('flights.index') }}">Find flights</a></div><div class="col-md-4"><h6>Staygo</h6><p class="text-white-50 small">Hotel availability and prices are supplied by connected providers and may change until confirmed.</p></div></div><hr class="border-secondary"><small class="text-white-50">© {{ date('Y') }} Staygo. All rights reserved.</small></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ asset('js/staygo.js') }}"></script>
 @stack('scripts')
