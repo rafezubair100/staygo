@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\FlightBooking;
 use App\Models\Hotel;
 use App\Services\LiteApiService;
 use Illuminate\Http\Request;
@@ -12,7 +13,13 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $bookings = $request->user()->bookings()->with('hotel')->latest()->paginate(10);
-        return view('bookings.index', compact('bookings'));
+
+        $flightBookings = FlightBooking::where('user_id', $request->user()->id)
+            ->latest()
+            ->take(20)
+            ->get();
+
+        return view('bookings.index', compact('bookings', 'flightBookings'));
     }
 
     public function store(Request $request, Hotel $hotel)
