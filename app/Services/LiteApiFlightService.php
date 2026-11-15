@@ -210,6 +210,237 @@ class LiteApiFlightService
     }
 
     /**
+     * Recheck a chosen fare before booking.
+     *
+     * Returns ['ok' => bool, 'error' => ?string, 'code' => mixed,
+     * 'data' => ?array]. The data holds the current total and whether
+     * the price changed since the search.
+     */
+    public function verify(string $offerId): array
+    {
+        if (!$this->configured() || trim($offerId) === '') {
+            return $this->failure('This fare could not be checked.');
+        }
+
+        try {
+            $response = $this->client(60)->post($this->url('/flights/verify'), [
+                'offerId' => trim($offerId),
+            ]);
+
+            $payload = $response->json();
+            $item = data_get($payload, 'data.0');
+            $total = data_get($item, 'journey.pricing.display.total');
+
+            if (!$response->successful() || !is_array($item) || !is_numeric($total)) {
+                return $this->supplierFailure(
+                    'verify',
+                    $response->status(),
+                    $payload,
+                    'This fare is no longer available. Please search again and choose another flight.'
+                );
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'code' => null,
+                'data' => [
+                    'price' => round((float) $total, 2),
+                    'currency' => data_get($item, 'journey.pricing.display.currency'),
+                    'price_changed' => (bool) data_get($item, 'changes.priceChanged', false),
+                    'old_price' => data_get($item, 'changes.pricing.old.display.total'),
+                    'fare_changed' => (bool) data_get($item, 'changes.fareChanged', false),
+                    'expires_at' => data_get($item, 'journey.expiration'),
+                    'refundable' => (bool) data_get($item, 'journey.terms.refundable', false),
+                    'changeable' => (bool) data_get($item, 'journey.terms.changeable', false),
+                ],
+            ];
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI flight verify connection error.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $this->failure('The flight service could not be reached. Please try again.');
+        }
+    }
+
+    /**
+     * Reserve a fare with the traveller details, ready to be booked.
+     *
+     * $contact: ['firstName', 'lastName', 'email', 'phoneCountryCode', 'phoneNumber']
+     * $passengers: one entry per traveller, each with 'passengerType'
+     *   (0 adult, 1 child, 2 infant), 'firstName', 'lastName', 'birthday'
+     *   (YYYY-MM-DD), 'gender' (M, F or X) and 'nationality' (two-letter
+     *   country code). Passport fields are optional.
+     *
+     * Returns ['ok' => bool, 'error' => ?string, 'code' => mixed,
+     * 'data' => ?array]. The prebook_id in the data is needed by book().
+     */
+    public function prebook(string $offerId, array $contact, array $passengers, bool $usePaymentSdk = false): array
+    {
+        if (!$this->configured() || trim($offerId) === '' || count($passengers) === 0) {
+            return $this->failure('This flight could not be reserved.');
+        }
+
+        try {
+            $response = $this->client(75)->post($this->url('/flights/prebooks'), [
+                'offerId' => trim($offerId),
+                'usePaymentSdk' => $usePaymentSdk,
+                'travelPurpose' => 'LEISURE',
+                'contact' => $contact,
+                'passengers' => array_values($passengers),
+            ]);
+
+            $payload = $response->json();
+            $item = data_get($payload, 'data.0');
+
+            if (!$response->successful() || !is_array($item) || empty($item['prebookId'])) {
+                return $this->supplierFailure(
+                    'prebook',
+                    $response->status(),
+                    $payload,
+                    'This flight could not be reserved. Please check the traveller details or choose another flight.'
+                );
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'code' => null,
+                'data' => [
+                    'prebook_id' => $item['prebookId'],
+                    'price' => is_numeric($item['price'] ?? null) ? round((float) $item['price'], 2) : null,
+                    'currency' => $item['currency'] ?? null,
+                    'booking_ref' => data_get($item, 'booking.bookingRef'),
+                    'payment_types' => (array) ($item['paymentTypes'] ?? []),
+                ],
+            ];
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI flight prebook connection error.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $this->failure('The flight service could not be reached. Please try again.');
+        }
+    }
+
+    /**
+     * Confirm a reserved flight.
+     *
+     * Only sandbox keys are accepted. Sandbox bookings are simulated
+     * and nothing is charged. Live payments are not set up yet, so a
+     * production key is refused here.
+     *
+     * Returns ['ok' => bool, 'error' => ?string, 'code' => mixed,
+     * 'data' => ?array].
+     */
+    public function book(string $prebookId): array
+    {
+        if (!$this->configured() || trim($prebookId) === '') {
+            return $this->failure('This booking could not be started.');
+        }
+
+        if (!$this->sandbox()) {
+            return $this->failure('Online payment is not available yet, so this flight was not booked.');
+        }
+
+        try {
+            $response = $this->client(90)->post($this->url('/flights/bookings'), [
+                'prebookId' => trim($prebookId),
+                'payment' => [
+                    'method' => 'ACC_CREDIT_CARD',
+                ],
+            ]);
+
+            $payload = $response->json();
+            $booking = data_get($payload, 'data.0.booking');
+
+            if (!$response->successful() || !is_array($booking) || empty($booking['bookingId'])) {
+                return $this->supplierFailure(
+                    'book',
+                    $response->status(),
+                    $payload,
+                    'The flight could not be booked. You have not been charged.'
+                );
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'code' => null,
+                'data' => [
+                    'booking_id' => $booking['bookingId'],
+                    'booking_ref' => $booking['bookingRef'] ?? null,
+                    'status' => strtoupper((string) ($booking['status'] ?? '')),
+                    'payment_status' => $booking['paymentStatus'] ?? null,
+                    'pnrs' => collect(data_get($booking, 'order.reference.airlineBookings') ?? [])
+                        ->map(fn ($airline) => data_get($airline, 'pnr') ?: data_get($airline, 'airlinePnr'))
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all(),
+                    'price' => is_numeric(data_get($booking, 'pricing.totalAmount'))
+                        ? round((float) data_get($booking, 'pricing.totalAmount'), 2)
+                        : null,
+                    'currency' => data_get($booking, 'pricing.currency'),
+                    'sandbox' => true,
+                ],
+            ];
+
+        } catch (\Throwable $exception) {
+            Log::warning('LiteAPI flight book connection error.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $this->failure('The flight service could not be reached. Please check My bookings before trying again.');
+        }
+    }
+
+    /**
+     * Whether the configured key is a sandbox (test) key.
+     */
+    public function sandbox(): bool
+    {
+        return str_starts_with((string) config('services.liteapi.api_key'), 'sand_');
+    }
+
+    /**
+     * Build a failed result with a message that is safe to show.
+     */
+    protected function failure(string $message, mixed $code = null): array
+    {
+        return ['ok' => false, 'error' => $message, 'code' => $code, 'data' => null];
+    }
+
+    /**
+     * Log a supplier error and build a failed result.
+     */
+    protected function supplierFailure(string $step, int $status, mixed $payload, string $message): array
+    {
+        $code = data_get($payload, 'error.code');
+
+        Log::warning('LiteAPI flight '.$step.' failed.', [
+            'status' => $status,
+            'code' => $code,
+            'key' => data_get($payload, 'error.key'),
+            'message' => data_get($payload, 'error.message'),
+            'description' => data_get($payload, 'error.description'),
+        ]);
+
+        // Code 43002 means the traveller details were rejected. The
+        // supplier's explanation tells the guest what to correct.
+        $description = data_get($payload, 'error.description');
+
+        if ($code === 43002 && is_string($description) && trim($description) !== '') {
+            $message = 'Please check the traveller details. '.trim($description);
+        }
+
+        return $this->failure($message, $code);
+    }
+
+    /**
      * Convert one supplier journey into the standard format.
      */
     protected function journey(array $journey): ?array
