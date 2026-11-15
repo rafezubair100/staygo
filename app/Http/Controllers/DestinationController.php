@@ -32,9 +32,14 @@ class DestinationController extends Controller
             }
         }
 
-        $conditions = $weather->current($name);
-
         $center = $summary['coordinates'] ?? null;
+
+        // Weather uses the coordinates, so it works for any place found.
+        $conditions = $weather->current(
+            $summary['title'] ?? $name,
+            $center['latitude'] ?? null,
+            $center['longitude'] ?? null
+        );
 
         $criteria = [
             'keyword' => $summary['title'] ?? $name,
