@@ -32,9 +32,17 @@
         @if($conditions)
           <div class="display-5 fw-bold">{{ round($conditions['temperature']) }}°C</div>
           <p class="text-capitalize">{{ $conditions['condition'] }}</p>
-          <p class="text-muted small mb-0">Humidity {{ $conditions['humidity'] }}% · Wind {{ $conditions['wind'] }} m/s</p>
+          <p class="text-muted small mb-2">
+            @if(is_numeric($conditions['humidity'] ?? null)) Humidity {{ round($conditions['humidity']) }}% @endif
+            @if(is_numeric($conditions['wind'] ?? null)) · Wind {{ round($conditions['wind'], 1) }} m/s @endif
+          </p>
+          @if(($conditions['source'] ?? '') === 'Open-Meteo')
+            <small class="text-muted">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></small>
+          @elseif(!empty($conditions['source']))
+            <small class="text-muted">Weather data by {{ $conditions['source'] }}</small>
+          @endif
         @else
-          <p class="text-muted mb-0">Weather is unavailable. Add an OpenWeather API key in your environment settings.</p>
+          <p class="text-muted mb-0">Weather is not available for this destination right now.</p>
         @endif
       </div>
 
