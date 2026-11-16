@@ -49,8 +49,13 @@
                   <small class="d-block text-muted">PNR {{ $flight->pnr }}</small>
                 @endif
               </td>
-              <td class="text-end">
+              <td class="text-end text-nowrap">
                 <a class="btn btn-sm btn-outline-primary" href="{{ route('flights.confirmation', $flight) }}">View</a>
+                @if($flight->canBeReviewed())
+                  <a class="btn btn-sm btn-outline-success" href="{{ route('reviews.flight.create', $flight) }}">Write review</a>
+                @elseif($flight->review)
+                  <small class="text-muted d-block mt-1">Reviewed ★ {{ $flight->review->rating }}</small>
+                @endif
               </td>
             </tr>
           @endforeach
@@ -144,6 +149,11 @@
               @endif
               @if($booking->canBeCancelled())
                 <a class="btn btn-sm btn-outline-danger" href="{{ route('bookings.cancel.form', $booking) }}">Cancel</a>
+              @endif
+              @if($booking->canBeReviewed())
+                <a class="btn btn-sm btn-outline-success" href="{{ route('reviews.booking.create', $booking) }}">Write review</a>
+              @elseif($booking->review)
+                <small class="text-muted d-block mt-1">Reviewed ★ {{ $booking->review->rating }}</small>
               @endif
             </td>
           </tr>
