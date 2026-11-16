@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FlightBooking extends Model
 {
@@ -32,6 +33,29 @@ class FlightBooking extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(Review::class);
+    }
+
+    /**
+     * Whether the traveller can review this flight: it must not be
+     * cancelled and must not have been reviewed yet.
+     */
+    public function canBeReviewed(): bool
+    {
+        return !$this->isCancelled() && $this->review === null;
+    }
+
+    /**
+     * A short description of the trip, used as a review heading.
+     */
+    public function routeLabel(): string
+    {
+        return $this->origin.' → '.$this->destination
+            .($this->airlines ? ' · '.$this->airlines : '');
     }
 
     /**
