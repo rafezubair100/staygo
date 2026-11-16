@@ -22,6 +22,8 @@ Route::get('/stays/{hotelId}', [LiveHotelController::class, 'show'])
     ->name('stays.show');
 Route::get('/destinations/{city}', [DestinationController::class, 'show'])->name('destinations.show');
 
+Route::get('/reviews', [ReviewController::class, 'index'])->name('reviews.index');
+
 Route::get('/flights', [FlightController::class, 'index'])->name('flights.index');
 Route::get('/airport-suggestions', [FlightController::class, 'airports'])
     ->middleware('throttle:60,1')
@@ -63,6 +65,18 @@ Route::middleware('auth')->group(function () {
         ->name('flights.checkout.confirm');
     Route::get('/flight-bookings/{flightBooking}/confirmation', [FlightCheckoutController::class, 'confirmation'])
         ->name('flights.confirmation');
+
+    // Reviews of booked hotels and flights.
+    Route::get('/bookings/{booking}/review', [ReviewController::class, 'createForBooking'])
+        ->name('reviews.booking.create');
+    Route::post('/bookings/{booking}/review', [ReviewController::class, 'storeForBooking'])
+        ->middleware('throttle:6,1')
+        ->name('reviews.booking.store');
+    Route::get('/flight-bookings/{flightBooking}/review', [ReviewController::class, 'createForFlight'])
+        ->name('reviews.flight.create');
+    Route::post('/flight-bookings/{flightBooking}/review', [ReviewController::class, 'storeForFlight'])
+        ->middleware('throttle:6,1')
+        ->name('reviews.flight.store');
 
     // Cancelling a live booking.
     Route::get('/bookings/{booking}/cancel', [BookingController::class, 'cancelForm'])
