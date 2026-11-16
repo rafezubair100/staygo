@@ -155,6 +155,20 @@
         <div class="empty-state">No rooms are available for these dates. Try different dates or fewer guests.</div>
       @endforelse
 
+      {{-- Reviews from Staygo guests --}}
+      <h3 class="mt-5">Reviews from Staygo guests</h3>
+      @if($reviews->count() > 0)
+        <p class="text-muted">
+          {{ number_format($reviews->avg('rating'), 1) }} out of 5
+          from {{ $reviews->count() }} {{ Str::plural('review', $reviews->count()) }} by guests who booked here.
+        </p>
+        @foreach($reviews as $review)
+          @include('reviews.partials.card', ['review' => $review, 'showSubject' => false])
+        @endforeach
+      @else
+        <p class="text-muted">No Staygo guests have reviewed this hotel yet. After you book, you can write a review from My bookings.</p>
+      @endif
+
       @if(!empty($hotel['important_information']))
         <h3 class="mt-5">Important information</h3>
         <p>{{ $hotel['important_information'] }}</p>
