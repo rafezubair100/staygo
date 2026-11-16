@@ -19,6 +19,7 @@
         <li><a class="nav-link" href="{{ route('home') }}">Hotels</a></li>
         <li><a class="nav-link" href="{{ route('flights.index') }}">Flights</a></li>
         <li><a class="nav-link" href="{{ route('home') }}#destinations">Destinations</a></li>
+        <li><a class="nav-link" href="{{ route('reviews.index') }}">Reviews</a></li>
         <li><a class="nav-link" href="{{ route('home') }}#why">Why Staygo</a></li>
         @auth
           <li><a class="nav-link" href="{{ route('account') }}">My account</a></li>
