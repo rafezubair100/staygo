@@ -12,9 +12,10 @@ class BookingController extends Controller
 {
     public function index(Request $request)
     {
-        $bookings = $request->user()->bookings()->with('hotel')->latest()->paginate(10);
+        $bookings = $request->user()->bookings()->with(['hotel', 'review'])->latest()->paginate(10);
 
-        $flightBookings = FlightBooking::where('user_id', $request->user()->id)
+        $flightBookings = FlightBooking::with('review')
+            ->where('user_id', $request->user()->id)
             ->latest()
             ->take(20)
             ->get();
