@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Review;
 use App\Services\LiteApiService;
 use App\Services\WeatherService;
 use Illuminate\Http\Request;
@@ -55,11 +56,20 @@ class LiveHotelController extends Controller
             is_numeric($hotel['longitude']) ? (float) $hotel['longitude'] : null
         );
 
+        // Published reviews written by guests who booked this hotel.
+        $reviews = Review::with('user')
+            ->where('supplier_hotel_id', $hotelId)
+            ->where('status', 'published')
+            ->latest()
+            ->take(20)
+            ->get();
+
         return view('hotels.live', [
             'hotel' => $hotel,
             'rooms' => $rooms,
             'nights' => $nights,
             'conditions' => $conditions,
+            'reviews' => $reviews,
             'criteria' => [
                 'check_in' => $checkIn,
                 'check_out' => $checkOut,
