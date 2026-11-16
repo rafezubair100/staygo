@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Booking extends Model
 {
@@ -37,6 +38,22 @@ class Booking extends Model
     public function hotel(): BelongsTo
     {
         return $this->belongsTo(Hotel::class);
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(Review::class);
+    }
+
+    /**
+     * Whether the guest can review this booking: it must be a live
+     * booking that was confirmed, not cancelled, and not reviewed yet.
+     */
+    public function canBeReviewed(): bool
+    {
+        return $this->isLive()
+            && $this->status === 'confirmed'
+            && $this->review === null;
     }
 
     /**
