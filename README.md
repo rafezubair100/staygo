@@ -207,3 +207,25 @@ php artisan test
 ## Current delivery status
 
 This ZIP is a runnable Laravel 13 foundation with working UI and first-pass core workflows. It is **not yet a production-ready global OTA**. Real-time supplier inventory depends on approved API credentials and the supplier booking lifecycle, payment orchestration, cancellation, room inventory, email, and production security work described above. Build and test those phases before accepting customer payments or promising reservations.
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    A["Customer / Visitor"] --> B["Staygo Website"]
+    B --> C["Laravel 13 Application"]
+
+    C --> D["Hotel Search"]
+    C --> E["Destination Information"]
+    C --> F["User Accounts"]
+    C --> G["Bookings & Reviews"]
+
+    D --> H[("MySQL Database")]
+    E --> I["Wikipedia API"]
+    D -. "Planned / requires API access" .-> J["Amadeus Hotel API"]
+
+    C --> K["Admin Dashboard"]
+    C --> L["Manager Dashboard"]
+
+    style J stroke-dasharray: 5 5
+```
